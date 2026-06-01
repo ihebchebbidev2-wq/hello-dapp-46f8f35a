@@ -24,13 +24,13 @@ final class OperationPriceResolver
     {
         $date ??= now()->toDateString();
 
-        // v6: Always return the LATEST price_history entry for the entity.
-        // Cost reports must reflect the current authoritative price for every
-        // op (no per-row drift). $date is kept in the signature for callers
-        // that still pass it, but is intentionally not used in the lookup.
+        // Return the price that was active on $date (effective_from <= $date),
+        // so that price_at_entry snapshots the historically correct value.
+        // Changing a price today must NOT alter the snapshot stored on past ops.
         $row = DB::table('price_history')
             ->where('entity_type', $entityType)
             ->when($entityId !== null, fn ($q) => $q->where('entity_id', $entityId))
+            ->where('effective_from', '<=', $date)
             ->orderByDesc('effective_from')
             ->orderByDesc('id')
             ->first(['price_per_unit']);

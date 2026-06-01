@@ -12,10 +12,10 @@
  *   legacy rows (created before the campaign FK was added) are still
  *   attributable to the active campaign by date.
  *
- * Cost calculations resolve fertilizer / pesticide / water / labor prices
- * by looking up price_history at operation_date — NOT the cached
- * `price_at_entry` snapshot. Snapshots can be wrong when prices were
- * back-corrected, which the client confirmed for the v4 cost report.
+ * Cost calculations use the `price_at_entry` snapshot frozen at operation
+ * creation time, falling back to the price_history row effective on
+ * operation_date. The LATEST price is never used — price changes must not
+ * retroactively alter historical costs.
  */
 
 declare(strict_types=1);
@@ -327,41 +327,29 @@ final class ReportController extends Controller
             ->get()
             ->keyBy('id');
 
-        // For cost: resolve the effective price from price_history at
-        // operation_date (correlated subquery). This replaces the cached
-        // `price_at_entry` so back-corrected prices propagate to the report.
-        //
-        // v5 (client: "le coût de fertilisation est faux"):
-        //  - Add deterministic tiebreaker (id DESC) so two price_history rows
-        //    sharing the same effective_from don't pick a random one.
-        //  - Add a SECOND fallback to the EARLIEST known price for the entity
-        //    when the op_date is older than any price_history row. Previously
-        //    we silently fell back to the cached `op.price_at_entry`, which
-        //    could be stale/incorrect (different value across ops of the same
-        //    fertilizer), producing per-row drift like 0.72 vs 0.75 for
-        //    Ammonitre. The cached value is only used as a last resort now.
-        // v6 (client: "le coût de fertilisation doit être 287.7, pas 288.45"):
-        //  Cost report ALWAYS uses the LATEST price_history entry for the entity,
-        //  not the price effective at operation_date. The business rule is "use
-        //  the current authoritative price for every operation" so that price
-        //  corrections retro-apply to all past ops (no per-row drift between
-        //  0.72 and 0.75 for the same fertilizer).
+        // Use the price that was active at the time the operation was recorded
+        // (price_at_entry), falling back to the price_history row whose
+        // effective_from <= operation_date only when price_at_entry is absent.
+        // Never use the LATEST price — changing a price today must not alter
+        // historical costs from 2024 or any prior period.
         $priceLookup = fn (string $entityType, string $entityFkColumn) => '(
             COALESCE(
+                NULLIF(op.price_at_entry, 0),
                 (SELECT ph.price_per_unit FROM price_history ph
                  WHERE ph.entity_type = '."'$entityType'".'
                    AND ph.entity_id = op.'.$entityFkColumn.'
-                 ORDER BY ph.effective_from DESC, ph.id DESC LIMIT 1),
-                op.price_at_entry
+                   AND ph.effective_from <= op.operation_date
+                 ORDER BY ph.effective_from DESC, ph.id DESC LIMIT 1)
             )
         )';
 
         $globalPriceLookup = fn (string $entityType, string $fallbackColumn = 'price_at_entry') => '(
             COALESCE(
+                NULLIF(op.'.$fallbackColumn.', 0),
                 (SELECT ph.price_per_unit FROM price_history ph
                  WHERE ph.entity_type = '."'$entityType'".'
-                 ORDER BY ph.effective_from DESC, ph.id DESC LIMIT 1),
-                op.'.$fallbackColumn.'
+                   AND ph.effective_from <= op.operation_date
+                 ORDER BY ph.effective_from DESC, ph.id DESC LIMIT 1)
             )
         )';
 
