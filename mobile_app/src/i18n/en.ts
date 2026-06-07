@@ -43,6 +43,8 @@ export const en = {
     fertOverWarn: 'Aberrant value: ~{{perHa}} kg/ha. Please double-check the quantity.',
     pesticides: 'Pesticides', addPesticide: '+ Add pesticide',
     totalWater: 'Spray volume (plot)',
+    dosePer100L: 'Qty/100L',
+    perPlot: '/ plot',
     targetPest: 'Target pest',
     selectPest: '— Select —',
     remarks: 'Remarks',

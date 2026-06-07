@@ -100,6 +100,7 @@ export const en = {
     composition: 'Composition',
     pest: 'Target pest',
     pesticidePerHa: 'Pesticide / ha',
+    volumePerHa: 'Volume / ha',
     remarks: 'Remarks',
     irrigationCost: 'Irrigation (TND)',
     fertilizationCost: 'Fertilization (TND)',

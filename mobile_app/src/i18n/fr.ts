@@ -43,6 +43,8 @@ export const fr = {
     fertOverWarn: 'Valeur aberrante : ~{{perHa}} kg/ha. Veuillez vérifier la quantité.',
     pesticides: 'Pesticides', addPesticide: '+ Ajouter un pesticide',
     totalWater: 'Volume de bouillie (parcelle)',
+    dosePer100L: 'Qté/100L',
+    perPlot: '/ parcelle',
     targetPest: 'Bioagresseur ciblé',
     selectPest: '— Sélectionner —',
     remarks: 'Remarques',

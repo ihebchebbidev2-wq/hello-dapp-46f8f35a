@@ -509,7 +509,15 @@
     break-inside: avoid;
     background: #ffffff !important;
   }
-  .recharts-surface { overflow: visible !important; }
+  /* The actual <svg> surface keeps the pixel width/height attributes Recharts
+     measured on screen, so on a narrower A4 page it overflowed / collapsed and
+     the chart looked empty (client bug: graphs missing in the PDF). Pin it to
+     fill the print container so it scales down to the page. */
+  .recharts-surface {
+    overflow: visible !important;
+    width: 100% !important;
+    height: 260px !important;
+  }
 
   .recharts-text,
   .recharts-cartesian-axis-tick text,

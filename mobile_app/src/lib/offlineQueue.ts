@@ -295,8 +295,8 @@ function buildPostings(item: OutboxRecord): Posting[] {
     }
     case 'phytosanitary': {
       const rows = (p.items as Array<Record<string, unknown>>) ?? [];
-      const targetPest = (p.target_pest ?? null) as string | null;
       const remarks = (p.remarks ?? null) as string | null;
+      const waterVolume = Number(p.water_total_l ?? p.water_volume_l ?? 0);
       return rows.map((it, idx) => ({
         client_id: `${item.id}:${idx}`,
         operation_type: 'phytosanitary' as const,
@@ -304,7 +304,10 @@ function buildPostings(item: OutboxRecord): Posting[] {
           plot_id, operation_date: date,
           pesticide_id: it.pesticide_id as string,
           quantity_applied: Number(it.quantity_applied ?? it.quantity ?? 0),
-          target_pest: targetPest, remarks,
+          water_volume_l: Number(it.water_volume_l ?? waterVolume),
+          // Per-pesticide bioagresseur, falling back to a treatment-wide one.
+          target_pest: (it.target_pest ?? p.target_pest ?? null) as string | null,
+          remarks,
         },
         submitted_at, device_info,
       }));

@@ -22,6 +22,7 @@ final class StorePhytosanitaryOperationRequest extends FormRequest
             'pesticide_id'     => ['required', 'uuid', 'exists:pesticides,id'],
             'operation_date'   => ['required', 'date', 'date_format:Y-m-d'],
             'quantity_applied' => ['required', 'numeric', 'gt:0', 'max:9999999.999', 'decimal:0,3'],
+            'water_volume_l'   => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:9999999.999', 'decimal:0,3'],
             'target_pest'      => ['sometimes', 'nullable', 'string', 'max:255'],
             'remarks'          => ['sometimes', 'nullable', 'string', 'max:2000'],
             'posting_id'       => ['sometimes', 'nullable', 'uuid', 'exists:postings,id'],

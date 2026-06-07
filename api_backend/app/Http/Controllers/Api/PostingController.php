@@ -313,7 +313,12 @@ final class PostingController extends Controller
                     'pesticide_id'     => $pesticide->id,
                     'operation_date'   => $date,
                     'quantity_applied' => $item['quantity_applied'],
-                    'target_pest'      => $payload['target_pest'] ?? null,
+                    // Spray-mix volume is recorded once per treatment but stored
+                    // on every pesticide row so the report can derive volume/ha.
+                    'water_volume_l'   => $item['water_volume_l'] ?? $payload['water_volume_l'] ?? null,
+                    // v5: each pesticide carries its own targeted bioagresseur;
+                    // fall back to a treatment-wide value for older payloads.
+                    'target_pest'      => $item['target_pest'] ?? $payload['target_pest'] ?? null,
                     'remarks'          => $payload['remarks'] ?? null,
                     'price_at_entry'   => $price,
                     'created_by'       => $userId,

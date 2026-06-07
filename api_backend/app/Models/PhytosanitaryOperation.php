@@ -22,6 +22,7 @@ final class PhytosanitaryOperation extends Model
         'pesticide_id',
         'operation_date',
         'quantity_applied',
+        'water_volume_l',
         'target_pest',
         'remarks',
         'price_at_entry',
@@ -35,6 +36,7 @@ final class PhytosanitaryOperation extends Model
         return [
             'operation_date'   => 'date:Y-m-d',
             'quantity_applied' => 'decimal:3',
+            'water_volume_l'   => 'decimal:3',
             'price_at_entry'   => 'decimal:4',
         ];
     }

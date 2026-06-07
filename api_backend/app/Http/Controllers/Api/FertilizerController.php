@@ -21,6 +21,7 @@ use App\Http\Resources\FertilizerResource;
 use App\Models\Fertilizer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 final class FertilizerController extends Controller
 {
@@ -70,10 +71,43 @@ final class FertilizerController extends Controller
 
     public function update(UpdateFertilizerRequest $request, Fertilizer $fertilizer): JsonResponse
     {
+        $data = $request->validated();
+
+        // Capture the pre-edit composition so we only propagate genuine changes.
+        $original = [
+            'n_percent' => (float) $fertilizer->n_percent,
+            'p_percent' => (float) $fertilizer->p_percent,
+            'k_percent' => (float) $fertilizer->k_percent,
+        ];
+
         $fertilizer->fill([
-            ...$request->validated(),
+            ...$data,
             'updated_by' => $request->user()?->id,
         ])->save();
+
+        // N/P/K % is a fixed product property, NOT a time-varying value like
+        // price. When the admin *corrects* a mis-entered composition, the fix
+        // must also flow into the *_at_entry snapshots of operations already
+        // recorded — otherwise the fertilization report keeps reporting the
+        // wrong NPK for past entries (client feedback: Solupotasse P↔K mix-up).
+        // Price stays snapshotted (historical cost must not change); only the
+        // composition is back-filled.
+        $map = [
+            'n_percent' => 'n_at_entry',
+            'p_percent' => 'p_at_entry',
+            'k_percent' => 'k_at_entry',
+        ];
+        $propagate = [];
+        foreach ($map as $src => $dst) {
+            if (array_key_exists($src, $data) && (float) $data[$src] !== $original[$src]) {
+                $propagate[$dst] = $data[$src];
+            }
+        }
+        if ($propagate !== []) {
+            DB::table('fertilization_operations')
+                ->where('fertilizer_id', $fertilizer->id)
+                ->update($propagate);
+        }
 
         return $this->resourceResponse(FertilizerResource::class, $fertilizer->refresh());
     }

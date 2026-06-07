@@ -34,6 +34,7 @@ final class PhytosanitaryOperationResource extends JsonResource
                 : null,
             'operation_date'   => $op->operation_date?->toDateString(),
             'quantity_applied' => (float) $op->quantity_applied,
+            'water_volume_l'   => $op->water_volume_l !== null ? (float) $op->water_volume_l : null,
             'target_pest'      => $op->target_pest,
             'remarks'          => $op->remarks,
             'price_at_entry'   => (float) $op->price_at_entry,

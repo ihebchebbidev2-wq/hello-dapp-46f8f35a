@@ -35,6 +35,19 @@ final class OperationPriceResolver
             ->orderByDesc('id')
             ->first(['price_per_unit']);
 
+        // No price was effective yet on $date — fall back to the EARLIEST known
+        // price for this entity rather than snapshotting 0. Otherwise an
+        // operation back-dated before the first price record is stored with a
+        // zero cost and drops out of the production-cost report entirely.
+        if (! $row) {
+            $row = DB::table('price_history')
+                ->where('entity_type', $entityType)
+                ->when($entityId !== null, fn ($q) => $q->where('entity_id', $entityId))
+                ->orderBy('effective_from')
+                ->orderBy('id')
+                ->first(['price_per_unit']);
+        }
+
         return $row ? (string) $row->price_per_unit : '0.0000';
     }
 

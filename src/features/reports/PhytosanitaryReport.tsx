@@ -22,6 +22,8 @@ interface Treatment {
   chemical_composition: string;
   quantity_applied: number;
   pesticide_per_ha: number | null;
+  water_volume_l: number | null;
+  volume_per_ha: number | null;
   target_pest: string | null;
   remarks: string | null;
   price_at_entry: number;
@@ -41,6 +43,7 @@ interface FlatRow {
   remarks: string | null;
   surface_ha: number;
   pesticide_per_ha: number;
+  volume_per_ha: number | null;
 }
 
 const ColFilter = ({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) => (
@@ -96,6 +99,10 @@ const PhytosanitaryReport = () => {
       g.treatments.forEach((tx) => {
         const perHa = tx.pesticide_per_ha
           ?? (surface > 0 ? Math.round((tx.quantity_applied / surface) * 1000) / 1000 : 0);
+        const volPerHa = tx.volume_per_ha
+          ?? (tx.water_volume_l != null && surface > 0
+            ? Math.round((tx.water_volume_l / surface) * 1000) / 1000
+            : null);
         out.push({
           id: tx.id,
           plot_id: g.plot_id,
@@ -108,6 +115,7 @@ const PhytosanitaryReport = () => {
           remarks: tx.remarks,
           surface_ha: surface,
           pesticide_per_ha: perHa,
+          volume_per_ha: volPerHa,
         });
       });
     });
@@ -131,7 +139,7 @@ const PhytosanitaryReport = () => {
       if (f.pest && !(op.target_pest ?? '').toLowerCase().includes(f.pest.toLowerCase())) return false;
       if (f.remarks && !(op.remarks ?? '').toLowerCase().includes(f.remarks.toLowerCase())) return false;
       if (!q) return true;
-      const hay = `${op.operation_date} ${op.plot_name} ${op.pesticide_name} ${op.chemical_composition} ${op.target_pest ?? ''} ${op.remarks ?? ''} ${op.pesticide_per_ha}`;
+      const hay = `${op.operation_date} ${op.plot_name} ${op.pesticide_name} ${op.chemical_composition} ${op.target_pest ?? ''} ${op.remarks ?? ''} ${op.pesticide_per_ha} ${op.volume_per_ha ?? ''}`;
       return hay.toLowerCase().includes(q);
     });
   }, [enriched, colFilters, search, cropPlotIds]);
@@ -148,6 +156,7 @@ const PhytosanitaryReport = () => {
       [t('table.product', 'Product')]: r.pesticide_name,
       [t('table.composition', 'Composition')]: r.chemical_composition,
       [t('table.pesticidePerHa', 'Pesticide /ha')]: `${r.pesticide_per_ha} / ha`,
+      [t('table.volumePerHa', 'Volume /ha')]: r.volume_per_ha != null ? `${r.volume_per_ha} / ha` : '',
       [t('table.pest', 'Target pest')]: r.target_pest ?? '',
       [t('table.remarks', 'Remarks')]: r.remarks ?? '',
     })),
@@ -176,9 +185,9 @@ const PhytosanitaryReport = () => {
         filteredCount={filtered.length}
         totalCount={enriched.length}
         pagination={pagination}
-        minWidth={1000}
+        minWidth={1120}
       >
-        <table className="data-table min-w-[1000px]">
+        <table className="data-table min-w-[1120px]">
           <thead>
             <tr>
               <th><div className="flex flex-col gap-1">{t('table.date', 'Date')}<ColFilter value={colFilters.date} onChange={setCol('date')} placeholder="yyyy-mm-dd" /></div></th>
@@ -186,6 +195,7 @@ const PhytosanitaryReport = () => {
               <th><div className="flex flex-col gap-1">{t('table.product', 'Product')}<ColFilter value={colFilters.product} onChange={setCol('product')} /></div></th>
               <th><div className="flex flex-col gap-1">{t('table.composition', 'Composition')}<ColFilter value={colFilters.composition} onChange={setCol('composition')} /></div></th>
               <th>{t('table.pesticidePerHa', 'Pesticide /ha')}</th>
+              <th>{t('table.volumePerHa', 'Volume /ha')}</th>
               <th><div className="flex flex-col gap-1">{t('table.pest', 'Target pest')}<ColFilter value={colFilters.pest} onChange={setCol('pest')} /></div></th>
               <th><div className="flex flex-col gap-1">{t('table.remarks', 'Remarks')}<ColFilter value={colFilters.remarks} onChange={setCol('remarks')} /></div></th>
             </tr>
@@ -204,12 +214,13 @@ const PhytosanitaryReport = () => {
                 <td className="text-foreground">{row.pesticide_name}</td>
                 <td className="text-[11px]">{row.chemical_composition}</td>
                 <td className="font-semibold text-foreground whitespace-nowrap">{row.pesticide_per_ha}</td>
+                <td className="whitespace-nowrap">{row.volume_per_ha != null ? row.volume_per_ha : '—'}</td>
                 <td>{row.target_pest || '—'}</td>
                 <td className="text-[11px]">{row.remarks || '—'}</td>
               </tr>
             ))}
             <TableSkeletonRows
-              colSpan={7}
+              colSpan={8}
               isLoading={!filters.filtersReady || reportQuery.isLoading || (reportQuery.isFetching && enriched.length === 0)}
               isError={reportQuery.isError && !reportQuery.isFetching}
               isEmpty={filters.filtersReady && !reportQuery.isLoading && !reportQuery.isError && pagination.pageRows.length === 0}

@@ -205,6 +205,7 @@ final class ReportController extends Controller
                 'pesticides.chemical_composition',
                 'op.operation_date',
                 'op.quantity_applied',
+                'op.water_volume_l',
                 'op.target_pest',
                 'op.remarks',
                 'op.price_at_entry',
@@ -236,7 +237,8 @@ final class ReportController extends Controller
                 'plot_name'       => $first->plot_name,
                 'surface_area_ha' => $surface,
                 'treatments'      => $items->map(function ($r) use ($surface) {
-                    $qty = (float) $r->quantity_applied;
+                    $qty    = (float) $r->quantity_applied;
+                    $volume = $r->water_volume_l !== null ? (float) $r->water_volume_l : null;
 
                     return [
                         'id'                   => $r->id,
@@ -247,6 +249,8 @@ final class ReportController extends Controller
                         'chemical_composition' => $r->chemical_composition,
                         'quantity_applied'     => $qty,
                         'pesticide_per_ha'     => $surface > 0 ? round($qty / $surface, 3) : null,
+                        'water_volume_l'       => $volume,
+                        'volume_per_ha'        => ($volume !== null && $surface > 0) ? round($volume / $surface, 3) : null,
                         'target_pest'          => $r->target_pest,
                         'remarks'              => $r->remarks,
                         'price_at_entry'       => (float) $r->price_at_entry,
@@ -332,6 +336,12 @@ final class ReportController extends Controller
         // effective_from <= operation_date only when price_at_entry is absent.
         // Never use the LATEST price — changing a price today must not alter
         // historical costs from 2024 or any prior period.
+        // Final COALESCE arm: the EARLIEST known price for the entity. It only
+        // ever applies to operations dated *before* the first price_history row
+        // exists for that entity — without it those operations resolve to 0 and
+        // silently vanish from cost totals (client bug: P6/B12 water under-
+        // counted). Operations that DO have an applicable historical price keep
+        // using it, so changing a price today still never rewrites past costs.
         $priceLookup = fn (string $entityType, string $entityFkColumn) => '(
             COALESCE(
                 NULLIF(op.price_at_entry, 0),
@@ -339,7 +349,11 @@ final class ReportController extends Controller
                  WHERE ph.entity_type = '."'$entityType'".'
                    AND ph.entity_id = op.'.$entityFkColumn.'
                    AND ph.effective_from <= op.operation_date
-                 ORDER BY ph.effective_from DESC, ph.id DESC LIMIT 1)
+                 ORDER BY ph.effective_from DESC, ph.id DESC LIMIT 1),
+                (SELECT ph.price_per_unit FROM price_history ph
+                 WHERE ph.entity_type = '."'$entityType'".'
+                   AND ph.entity_id = op.'.$entityFkColumn.'
+                 ORDER BY ph.effective_from ASC, ph.id ASC LIMIT 1)
             )
         )';
 
@@ -349,7 +363,10 @@ final class ReportController extends Controller
                 (SELECT ph.price_per_unit FROM price_history ph
                  WHERE ph.entity_type = '."'$entityType'".'
                    AND ph.effective_from <= op.operation_date
-                 ORDER BY ph.effective_from DESC, ph.id DESC LIMIT 1)
+                 ORDER BY ph.effective_from DESC, ph.id DESC LIMIT 1),
+                (SELECT ph.price_per_unit FROM price_history ph
+                 WHERE ph.entity_type = '."'$entityType'".'
+                 ORDER BY ph.effective_from ASC, ph.id ASC LIMIT 1)
             )
         )';
 

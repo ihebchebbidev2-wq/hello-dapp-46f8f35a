@@ -62,6 +62,7 @@ final class PhytosanitaryOperationController extends Controller
             'pesticide_id'     => $pesticide->id,
             'operation_date'   => $date,
             'quantity_applied' => $data['quantity_applied'],
+            'water_volume_l'   => $data['water_volume_l'] ?? null,
             'target_pest'      => $data['target_pest'] ?? null,
             'remarks'          => $data['remarks'] ?? null,
             'price_at_entry'   => $this->prices->priceFor('pesticide', $pesticide->id, $date),

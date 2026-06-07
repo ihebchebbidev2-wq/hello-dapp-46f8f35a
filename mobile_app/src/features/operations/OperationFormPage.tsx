@@ -54,7 +54,6 @@ const OperationFormPage = ({ kind }: Props) => {
   const [fertItems, setFertItems] = useState<FertItem[]>([newFertItem()]);
   const [pestItems, setPestItems] = useState<PestItem[]>([newPestItem()]);
   const [waterTotalL, setWaterTotalL] = useState('');
-  const [targetPest, setTargetPest] = useState('');
   const [remarks, setRemarks] = useState('');
   const [harvestQty, setHarvestQty] = useState('');
   const [harvestWorkerDays, setHarvestWorkerDays] = useState('');
@@ -72,16 +71,29 @@ const OperationFormPage = ({ kind }: Props) => {
             .filter((it) => it.fertilizer_id && it.quantity)
             .map((it) => ({ fertilizer_id: it.fertilizer_id, quantity_applied: Number(it.quantity) })),
         };
-      case 'phytosanitary':
+      case 'phytosanitary': {
+        const vol = Number(waterTotalL) || 0;
         return {
           ...base,
+          // Each pesticide row stores a dose (Qté/100L); the absolute product
+          // quantity is derived as volume × dose ÷ 100 and sent as
+          // quantity_applied. Each row also carries its own bioagresseur.
           items: pestItems
             .filter((it) => it.pesticide_id && it.quantity)
-            .map((it) => ({ pesticide_id: it.pesticide_id, quantity_applied: Number(it.quantity) })),
-          water_total_l: Number(waterTotalL),
-          target_pest: targetPest || null,
+            .map((it) => {
+              const dose = Number(it.quantity) || 0;
+              return {
+                pesticide_id: it.pesticide_id,
+                dose_per_100l: dose,
+                quantity_applied: Number(((vol * dose) / 100).toFixed(3)),
+                water_volume_l: vol,
+                target_pest: it.target_pest || null,
+              };
+            }),
+          water_total_l: vol,
           remarks: remarks || null,
         };
+      }
       case 'harvest':
         return {
           ...base,
@@ -105,7 +117,13 @@ const OperationFormPage = ({ kind }: Props) => {
         return t('form.fertOverMax', { max: FERT_MAX_QTY, defaultValue: `Quantity exceeds the maximum of ${FERT_MAX_QTY} kg` });
       }
     }
-    if (kind === 'phytosanitary' && pestItems.every((i) => !i.pesticide_id || !i.quantity)) return t('form.invalid');
+    if (kind === 'phytosanitary') {
+      if (!(Number(waterTotalL) > 0)) return t('form.invalid');
+      const filled = pestItems.filter((i) => i.pesticide_id && i.quantity);
+      if (filled.length === 0) return t('form.invalid');
+      // One targeted bioagresseur is required per pesticide.
+      if (filled.some((i) => !i.target_pest)) return t('form.invalid');
+    }
     if (kind === 'harvest') {
       if (!(Number(harvestQty) > 0)) return t('form.invalid');
       if (!(Number(harvestWorkerDays) > 0)) return t('form.invalid');
@@ -223,7 +241,6 @@ const OperationFormPage = ({ kind }: Props) => {
                 items={pestItems} onItemsChange={setPestItems}
                 pesticides={refs.pesticides} pests={refs.pests}
                 waterTotalL={waterTotalL} onWaterChange={setWaterTotalL}
-                targetPest={targetPest} onTargetPestChange={setTargetPest}
                 remarks={remarks} onRemarksChange={setRemarks}
               />
             )}
