@@ -7,29 +7,37 @@
  *   quantity_applied = water_volume_l × dose / 100
  * and stored as before, while `water_volume_l` is persisted so the report can
  * show a "volume / ha" column.
+ *
+ * NOTE: this migration deliberately avoids Schema::hasColumn()/hasTable()
+ * introspection and runs OUTSIDE a transaction. On Neon's pooled Postgres a
+ * session can arrive with an already-aborted transaction, which makes the
+ * metadata SELECTs behind hasColumn() blow up with SQLSTATE 25P02. A single
+ * idempotent `ADD COLUMN IF NOT EXISTS` statement sidesteps that entirely.
  */
 
 declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /** Run without the implicit migration transaction (Neon pooler friendly). */
+    public $withinTransaction = false;
+
     public function up(): void
     {
-        if (Schema::hasTable('phytosanitary_operations')
-            && ! Schema::hasColumn('phytosanitary_operations', 'water_volume_l')) {
-            DB::statement('ALTER TABLE phytosanitary_operations ADD COLUMN water_volume_l numeric(12,3)');
-        }
+        // Clear any aborted-transaction state left on a pooled connection so
+        // the DDL below isn't rejected with 25P02.
+        try { DB::statement('ROLLBACK'); } catch (\Throwable) {}
+
+        DB::statement('ALTER TABLE phytosanitary_operations ADD COLUMN IF NOT EXISTS water_volume_l numeric(12,3)');
     }
 
     public function down(): void
     {
-        if (Schema::hasTable('phytosanitary_operations')
-            && Schema::hasColumn('phytosanitary_operations', 'water_volume_l')) {
-            DB::statement('ALTER TABLE phytosanitary_operations DROP COLUMN water_volume_l');
-        }
+        try { DB::statement('ROLLBACK'); } catch (\Throwable) {}
+
+        DB::statement('ALTER TABLE phytosanitary_operations DROP COLUMN IF EXISTS water_volume_l');
     }
 };
